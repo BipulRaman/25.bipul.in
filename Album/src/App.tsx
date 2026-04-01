@@ -10,14 +10,14 @@ function AppRoutes() {
   if (!config) return <Unauthorized />;
 
   return (
-    <>
+    <div className="app-layout">
       <Navbar />
       <main className="app-content">
         <Routes>
           <Route path="/" element={<AlbumList />} />
         </Routes>
       </main>
-    </>
+    </div>
   );
 }
 

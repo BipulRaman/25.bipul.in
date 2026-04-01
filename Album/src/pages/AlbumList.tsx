@@ -6,6 +6,8 @@ import type { Album, MediaItem } from '../types';
 import MediaViewer from '../components/MediaViewer';
 import VideoThumbnail from '../components/VideoThumbnail';
 
+const VIDEO_THUMBS_ENABLED = import.meta.env.VITE_VIDEO_THUMBNAILS !== 'false';
+
 export default function AlbumList() {
   const { config } = useConfig();
   const [searchParams] = useSearchParams();
@@ -13,6 +15,7 @@ export default function AlbumList() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [navigating, setNavigating] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -38,10 +41,11 @@ export default function AlbumList() {
     }
   }, [config, prefix]);
 
-  // Auto-load next page when current page finishes loading
+  // Auto-load next page with a delay to avoid flooding requests
   useEffect(() => {
     if (!loadingMore && hasMoreRef.current && !loading) {
-      loadMoreMedia();
+      const timer = setTimeout(() => loadMoreMedia(), 500);
+      return () => clearTimeout(timer);
     }
   }, [loadingMore, loading, loadMoreMedia]);
 
@@ -57,11 +61,13 @@ export default function AlbumList() {
   useEffect(() => {
     if (!config) return;
     let cancelled = false;
-    setLoading(true);
+    const isFirstLoad = mediaItems.length === 0 && albums.length === 0;
+    if (isFirstLoad) {
+      setLoading(true);
+    } else {
+      setNavigating(true);
+    }
     setError('');
-    setMediaItems([]);
-    setAlbums([]);
-    setThumbBatch(20);
     nextMarkerRef.current = '';
     hasMoreRef.current = false;
 
@@ -70,9 +76,11 @@ export default function AlbumList() {
         if (cancelled) return;
         setAlbums(result.albums);
         setMediaItems(result.mediaItems);
+        setThumbBatch(20);
         nextMarkerRef.current = result.nextMarker;
         hasMoreRef.current = result.hasMore;
         setLoading(false);
+        setNavigating(false);
       })
       .catch(err => {
         if (!cancelled) {
@@ -105,7 +113,7 @@ export default function AlbumList() {
   const breadcrumbs = prefix ? prefix.split('/').filter(Boolean) : [];
 
   return (
-    <div className="album-list-page">
+    <div className={`album-list-page${navigating ? ' navigating' : ''}`}>
       <div className="breadcrumbs">
         <Link to="/">Home</Link>
         {breadcrumbs.map((crumb, i) => {
@@ -175,7 +183,15 @@ export default function AlbumList() {
                         <img src={item.url} alt={item.name} loading="lazy" decoding="async" />
                       ) : (
                         <div className="video-thumb">
-                          <VideoThumbnail src={item.url} alt={item.name} active={videoIndex < thumbBatch} />
+                          {VIDEO_THUMBS_ENABLED ? (
+                            <VideoThumbnail src={item.url} alt={item.name} active={videoIndex < thumbBatch} />
+                          ) : (
+                            <div className="video-placeholder">
+                              <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
+                                <path d="M8 5v14l11-7z" />
+                              </svg>
+                            </div>
+                          )}
                           <div className="video-badge">
                             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
                               <path d="M8 5v14l11-7z" />
