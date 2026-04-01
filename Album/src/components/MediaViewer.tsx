@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react';
 import type { MediaItem } from '../types';
 
 interface MediaViewerProps {
@@ -11,6 +12,13 @@ export default function MediaViewer({ items, currentIndex, onClose, onNavigate }
   const item = items[currentIndex];
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < items.length - 1;
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (item.type === 'video' && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, [item.url, item.type]);
 
   return (
     <div className="media-viewer-overlay" onClick={onClose}>
@@ -38,7 +46,7 @@ export default function MediaViewer({ items, currentIndex, onClose, onNavigate }
             {item.type === 'image' ? (
               <img src={item.url} alt={item.name} />
             ) : (
-              <video src={item.url} controls autoPlay />
+              <video key={item.url} ref={videoRef} src={item.url} controls playsInline preload="metadata" />
             )}
           </div>
 

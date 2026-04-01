@@ -332,28 +332,6 @@ button:disabled {
   50% { opacity: 0.7; }
 }
 
-.video-badge {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  color: white;
-  border-radius: 50%;
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  transition: transform 0.2s, background 0.2s;
-}
-.media-card:hover .video-badge {
-  background: rgba(99, 102, 241, 0.8);
-  transform: translate(-50%, -50%) scale(1.1);
-}
-
 .media-name {
   padding: 10px 12px;
   font-size: 0.8rem;

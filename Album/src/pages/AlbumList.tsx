@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useConfig } from '../context/ConfigContext';
 import { listContents } from '../services/blobService';
@@ -7,6 +7,37 @@ import MediaViewer from '../components/MediaViewer';
 import VideoThumbnail from '../components/VideoThumbnail';
 
 const VIDEO_THUMBS_ENABLED = import.meta.env.VITE_VIDEO_THUMBNAILS !== 'false';
+
+interface MediaCardProps {
+  item: MediaItem;
+  index: number;
+  videoIndex: number;
+  thumbBatch: number;
+  onClick: () => void;
+}
+
+const MediaCard = memo(function MediaCard({ item, videoIndex, thumbBatch, onClick }: MediaCardProps) {
+  return (
+    <div className="media-card" onClick={onClick}>
+      {item.type === 'image' ? (
+        <img src={item.url} alt={item.name} loading="lazy" decoding="async" />
+      ) : (
+        <div className="video-thumb">
+          {VIDEO_THUMBS_ENABLED ? (
+            <VideoThumbnail src={item.url} alt={item.name} active={videoIndex < thumbBatch} />
+          ) : (
+            <div className="video-placeholder">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          )}
+        </div>
+      )}
+      <div className="media-name">{item.name}</div>
+    </div>
+  );
+});
 
 export default function AlbumList() {
   const { config } = useConfig();
@@ -169,40 +200,22 @@ export default function AlbumList() {
             <>
               {albums.length > 0 && <h2 className="section-title">Files</h2>}
               <div className="media-grid">
-                {mediaItems.map((item, index) => {
-                  const videoIndex = item.type === 'video'
-                    ? mediaItems.slice(0, index).filter(i => i.type === 'video').length
-                    : -1;
-                  return (
-                    <div
-                      key={item.url}
-                      className="media-card"
-                      onClick={() => setViewerIndex(index)}
-                    >
-                      {item.type === 'image' ? (
-                        <img src={item.url} alt={item.name} loading="lazy" decoding="async" />
-                      ) : (
-                        <div className="video-thumb">
-                          {VIDEO_THUMBS_ENABLED ? (
-                            <VideoThumbnail src={item.url} alt={item.name} active={videoIndex < thumbBatch} />
-                          ) : (
-                            <div className="video-placeholder">
-                              <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
-                                <path d="M8 5v14l11-7z" />
-                              </svg>
-                            </div>
-                          )}
-                          <div className="video-badge">
-                            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
-                          </div>
-                        </div>
-                      )}
-                      <div className="media-name">{item.name}</div>
-                    </div>
-                  );
-                })}
+                {(() => {
+                  let vIdx = 0;
+                  return mediaItems.map((item, index) => {
+                    const videoIndex = item.type === 'video' ? vIdx++ : -1;
+                    return (
+                      <MediaCard
+                        key={item.url}
+                        item={item}
+                        index={index}
+                        videoIndex={videoIndex}
+                        thumbBatch={thumbBatch}
+                        onClick={() => setViewerIndex(index)}
+                      />
+                    );
+                  });
+                })()}
               </div>
               {loadingMore && <div className="loading">Loading more...</div>}
             </>
