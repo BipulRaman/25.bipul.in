@@ -1,0 +1,16 @@
+{
+  "roles": {
+    "account": ["home"],
+    "folder": ["home"]
+  },
+  "users": {
+    "mail@bipul.in": ["admin"],
+    "bipulraman@gmail.com": ["home"],
+    "sinhadilip25@gmail.com": ["home"],
+    "binabibha@gmail.com": ["home"],
+    "swati@bipul.in": ["home"],
+    "archana18jan@gmail.com": ["home"],
+    "smanishcongo@gmail.com": ["home"]
+  },
+  "defaultRole": ""
+}

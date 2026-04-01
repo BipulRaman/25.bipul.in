@@ -1,9 +1,8 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { BlobConfig } from '../types';
+import configData from '../../data.json';
 
 const SESSION_KEY = 'album-viewer-sas';
-const ACCOUNT_NAME = import.meta.env.VITE_AZURE_ACCOUNT_NAME ?? '';
-const CONTAINER_NAME = import.meta.env.VITE_AZURE_CONTAINER_NAME ?? '';
 
 interface ConfigContextValue {
   config: BlobConfig | null;
@@ -11,38 +10,39 @@ interface ConfigContextValue {
 
 const ConfigContext = createContext<ConfigContextValue | null>(null);
 
-function extractToken(): string | null {
-  // 1. Check URL for ?t=<base64-encoded-sas-token>
-  const params = new URLSearchParams(window.location.search);
-  const tokenParam = params.get('t');
-  if (tokenParam) {
+function extractConfig(): BlobConfig | null {
+  // 1. Try data.json: concatenate file names (strip .json), base64-decode to get SAS token
+  if (configData?.root && configData?.folder && configData?.files?.length) {
+    const base64 = configData.files.map((f: string) => f.replace(/\.json$/, '')).join('');
     try {
-      const decoded = atob(tokenParam);
-      sessionStorage.setItem(SESSION_KEY, decoded);
-      // Remove ?t= from URL to keep it clean
-      params.delete('t');
-      const clean = params.toString();
-      const newUrl = window.location.pathname + (clean ? `?${clean}` : '') + window.location.hash;
-      window.history.replaceState({}, '', newUrl);
-      return decoded;
+      const sasToken = atob(base64);
+      return {
+        accountName: configData.root,
+        containerName: configData.folder,
+        sasToken,
+      };
     } catch { /* invalid base64, fall through */ }
   }
 
-  // 2. Check sessionStorage
-  const stored = sessionStorage.getItem(SESSION_KEY);
-  if (stored) return stored;
-
-  // 3. Fallback to env variable (for dev)
+  // 2. Fallback to env variables (for dev)
+  const accountName = import.meta.env.VITE_AZURE_ACCOUNT_NAME ?? '';
+  const containerName = import.meta.env.VITE_AZURE_CONTAINER_NAME ?? '';
   const envToken = import.meta.env.VITE_AZURE_SAS_TOKEN;
-  return envToken || null;
+  if (envToken) {
+    return { accountName, containerName, sasToken: envToken };
+  }
+
+  // 3. Check sessionStorage
+  const stored = sessionStorage.getItem(SESSION_KEY);
+  if (stored && accountName) {
+    return { accountName, containerName, sasToken: stored };
+  }
+
+  return null;
 }
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
-  const [config] = useState<BlobConfig | null>(() => {
-    const sasToken = extractToken();
-    if (!sasToken) return null;
-    return { accountName: ACCOUNT_NAME, containerName: CONTAINER_NAME, sasToken };
-  });
+  const [config] = useState<BlobConfig | null>(() => extractConfig());
 
   return (
     <ConfigContext.Provider value={{ config }}>

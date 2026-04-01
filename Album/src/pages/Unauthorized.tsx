@@ -1,14 +1,33 @@
-export default function Unauthorized() {
+export interface GoogleUser {
+  name: string;
+  email: string;
+  picture: string;
+}
+
+interface AccessDeniedProps {
+  user: GoogleUser;
+  onSignOut: () => void;
+}
+
+export default function AccessDenied({ user, onSignOut }: AccessDeniedProps) {
   return (
-    <div className="unauthorized-page">
-      <div className="unauthorized-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="64" height="64">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-          <path d="M7 11V7a5 5 0 0110 0v4" />
-        </svg>
-        <h1>Unauthorized</h1>
-        <p>A valid access token is required to view this album.</p>
-        <p className="unauthorized-hint">Please use an authorized link to access the album viewer.</p>
+    <div className="access-denied-screen">
+      <div className="access-denied-card">
+        <div className="access-denied-icon">🚫</div>
+        <h1 className="access-denied-title">Access Denied</h1>
+        <p className="access-denied-message">
+          You are not authorized to access this application.
+        </p>
+        <div className="access-denied-user">
+          <img src={user.picture} alt={user.name} className="access-denied-avatar" />
+          <div>
+            <div className="access-denied-name">{user.name}</div>
+            <div className="access-denied-email">{user.email}</div>
+          </div>
+        </div>
+        <button className="access-denied-btn" onClick={onSignOut}>
+          Sign out &amp; try another account
+        </button>
       </div>
     </div>
   );
