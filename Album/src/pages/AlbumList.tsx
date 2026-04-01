@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, memo } from 'react';
+import { useEffect, useState, useCallback, memo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useConfig } from '../context/ConfigContext';
 import { listContents } from '../services/blobService';
@@ -47,38 +47,9 @@ export default function AlbumList() {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [navigating, setNavigating] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [thumbBatch, setThumbBatch] = useState(20);
-  const nextMarkerRef = useRef('');
-  const hasMoreRef = useRef(false);
-  const loadingMoreRef = useRef(false);
-
-  const loadMoreMedia = useCallback(async () => {
-    if (!config || !hasMoreRef.current || loadingMoreRef.current) return;
-    loadingMoreRef.current = true;
-    setLoadingMore(true);
-    try {
-      const result = await listContents(config, prefix, nextMarkerRef.current);
-      setMediaItems(prev => [...prev, ...result.mediaItems]);
-      nextMarkerRef.current = result.nextMarker;
-      hasMoreRef.current = result.hasMore;
-    } catch (err) {
-      console.error('Failed to load more:', err);
-    } finally {
-      loadingMoreRef.current = false;
-      setLoadingMore(false);
-    }
-  }, [config, prefix]);
-
-  // Auto-load next page with a delay to avoid flooding requests
-  useEffect(() => {
-    if (!loadingMore && hasMoreRef.current && !loading) {
-      const timer = setTimeout(() => loadMoreMedia(), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [loadingMore, loading, loadMoreMedia]);
 
   // Progressively activate video thumbnails in batches of 20
   useEffect(() => {
@@ -99,26 +70,36 @@ export default function AlbumList() {
       setNavigating(true);
     }
     setError('');
-    nextMarkerRef.current = '';
-    hasMoreRef.current = false;
 
-    listContents(config, prefix)
-      .then((result) => {
+    async function loadAll() {
+      let marker = '';
+      let allMedia: MediaItem[] = [];
+      let allAlbums: Album[] = [];
+
+      do {
+        const result = await listContents(config!, prefix, marker);
         if (cancelled) return;
-        setAlbums(result.albums);
-        setMediaItems(result.mediaItems);
-        setThumbBatch(20);
-        nextMarkerRef.current = result.nextMarker;
-        hasMoreRef.current = result.hasMore;
+        allAlbums = marker === '' ? result.albums : allAlbums;
+        allMedia = [...allMedia, ...result.mediaItems];
+        marker = result.nextMarker;
+
+        // Update UI progressively so user sees items as they load
+        setAlbums(allAlbums);
+        setMediaItems(allMedia);
         setLoading(false);
         setNavigating(false);
-      })
-      .catch(err => {
-        if (!cancelled) {
-          setError(err.message);
-          setLoading(false);
-        }
-      });
+      } while (marker);
+
+      setThumbBatch(20);
+    }
+
+    loadAll().catch(err => {
+      if (!cancelled) {
+        setError(err.message);
+        setLoading(false);
+        setNavigating(false);
+      }
+    });
 
     return () => { cancelled = true; };
   }, [config, prefix]);
@@ -217,7 +198,6 @@ export default function AlbumList() {
                   });
                 })()}
               </div>
-              {loadingMore && <div className="loading">Loading more...</div>}
             </>
           )}
 
