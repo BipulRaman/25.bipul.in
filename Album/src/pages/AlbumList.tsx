@@ -4,6 +4,7 @@ import { useConfig } from '../context/ConfigContext';
 import { listContents } from '../services/blobService';
 import type { Album, MediaItem } from '../types';
 import MediaViewer from '../components/MediaViewer';
+import VideoThumbnail from '../components/VideoThumbnail';
 
 export default function AlbumList() {
   const { config } = useConfig();
@@ -15,9 +16,9 @@ export default function AlbumList() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [thumbBatch, setThumbBatch] = useState(20);
   const nextMarkerRef = useRef('');
   const hasMoreRef = useRef(false);
-  const observerRef = useRef<IntersectionObserver | null>(null);
   const loadingMoreRef = useRef(false);
 
   const loadMoreMedia = useCallback(async () => {
@@ -37,20 +38,21 @@ export default function AlbumList() {
     }
   }, [config, prefix]);
 
-  const sentinelCallback = useCallback((node: HTMLDivElement | null) => {
-    if (observerRef.current) observerRef.current.disconnect();
-    if (!node) return;
+  // Auto-load next page when current page finishes loading
+  useEffect(() => {
+    if (!loadingMore && hasMoreRef.current && !loading) {
+      loadMoreMedia();
+    }
+  }, [loadingMore, loading, loadMoreMedia]);
 
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          loadMoreMedia();
-        }
-      },
-      { rootMargin: '400px' }
-    );
-    observerRef.current.observe(node);
-  }, [loadMoreMedia]);
+  // Progressively activate video thumbnails in batches of 20
+  useEffect(() => {
+    const videoCount = mediaItems.filter(i => i.type === 'video').length;
+    if (thumbBatch < videoCount) {
+      const timer = setTimeout(() => setThumbBatch(b => b + 20), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [thumbBatch, mediaItems]);
 
   useEffect(() => {
     if (!config) return;
@@ -59,6 +61,7 @@ export default function AlbumList() {
     setError('');
     setMediaItems([]);
     setAlbums([]);
+    setThumbBatch(20);
     nextMarkerRef.current = '';
     hasMoreRef.current = false;
 
@@ -148,7 +151,6 @@ export default function AlbumList() {
                   </div>
                   <div className="album-info">
                     <h3>{album.name}</h3>
-                    <span>{album.itemCount} items</span>
                   </div>
                 </Link>
               ))}
@@ -159,28 +161,33 @@ export default function AlbumList() {
             <>
               {albums.length > 0 && <h2 className="section-title">Files</h2>}
               <div className="media-grid">
-                {mediaItems.map((item, index) => (
-                  <div
-                    key={item.url}
-                    className="media-card"
-                    onClick={() => setViewerIndex(index)}
-                  >
-                    {item.type === 'image' ? (
-                      <img src={item.url} alt={item.name} loading="lazy" decoding="async" />
-                    ) : (
-                      <div className="video-thumb">
-                        <div className="video-placeholder">
-                          <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
-                            <path d="M8 5v14l11-7z" />
-                          </svg>
+                {mediaItems.map((item, index) => {
+                  const videoIndex = item.type === 'video'
+                    ? mediaItems.slice(0, index).filter(i => i.type === 'video').length
+                    : -1;
+                  return (
+                    <div
+                      key={item.url}
+                      className="media-card"
+                      onClick={() => setViewerIndex(index)}
+                    >
+                      {item.type === 'image' ? (
+                        <img src={item.url} alt={item.name} loading="lazy" decoding="async" />
+                      ) : (
+                        <div className="video-thumb">
+                          <VideoThumbnail src={item.url} alt={item.name} active={videoIndex < thumbBatch} />
+                          <div className="video-badge">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    <div className="media-name">{item.name}</div>
-                  </div>
-                ))}
+                      )}
+                      <div className="media-name">{item.name}</div>
+                    </div>
+                  );
+                })}
               </div>
-              <div ref={sentinelCallback} className="scroll-sentinel" />
               {loadingMore && <div className="loading">Loading more...</div>}
             </>
           )}
